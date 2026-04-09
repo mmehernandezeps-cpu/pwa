@@ -1,0 +1,36 @@
+{
+  "name": "VMA Tracker — Course de Durée",
+  "short_name": "VMA Tracker",
+  "description": "Application de suivi en temps réel des courses de durée en EPS — chronométrage, passages et analyse VMA.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0c10",
+  "theme_color": "#00e5ff",
+  "lang": "fr",
+  "categories": ["education", "sports"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nouvelle séance",
+      "short_name": "Séance",
+      "description": "Démarrer une nouvelle course de durée",
+      "url": "./index.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

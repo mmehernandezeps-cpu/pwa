@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>VMA Tracker — Course de Durée</title>
+
+<!-- ── PWA Manifest ── -->
+<link rel="manifest" href="manifest.json">
+
+<!-- ── Theme & couleurs système ── -->
+<meta name="theme-color" content="#00e5ff">
+<meta name="msapplication-TileColor" content="#0a0c10">
+<meta name="msapplication-TileImage" content="icons/icon-192.png">
+
+<!-- ── iOS / Safari PWA ── -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VMA Tracker">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
+
+<!-- ── SEO & description ── -->
+<meta name="description" content="Suivi en temps réel des courses de durée en EPS — chronométrage, passages et analyse VMA.">
+<meta name="application-name" content="VMA Tracker">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- ── Icône standard ── -->
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;700&display=swap');
+  :root {
+    --bg:#0a0c10;--surface:#12151c;--surface2:#1a1f2b;--border:#252b38;
+    --accent:#00e5ff;--green:#00ff88;--red:#ff2d55;--yellow:#ffd700;
+    --text:#e8eaf0;--muted:#5a6070;--radius:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  header{display:flex;align-items:center;gap:16px;padding:18px 28px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+  header h1{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:3px;color:var(--accent);}
+  .step-indicator{display:flex;gap:8px;margin-left:auto;}
+  .step-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1rem;background:var(--surface2);border:2px solid var(--border);color:var(--muted);transition:all 0.3s;}
+  .step-dot.active{border-color:var(--accent);color:var(--accent);}
+  .step-dot.done{background:var(--accent);border-color:var(--accent);color:var(--bg);}
+  .screen{display:none;padding:28px;max-width:900px;margin:0 auto;}
+  .screen.active{display:block;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px;}
+  .card h2{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px;color:var(--accent);margin-bottom:18px;}
+  .card h3{font-family:'DM Sans',sans-serif;font-size:1rem;font-weight:700;color:var(--text);margin-bottom:12px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .form-grid.three{grid-template-columns:1fr 1fr 1fr;}
+  @media(max-width:600px){.form-grid,.form-grid.three{grid-template-columns:1fr;}}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  label{font-size:.75rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);}
+  input,select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'DM Mono',monospace;font-size:.95rem;width:100%;transition:border-color .2s;}
+  input:focus,select:focus{outline:none;border-color:var(--accent);}
+  .series-row{display:flex;align-items:center;gap:12px;background:var(--surface2);border-radius:8px;padding:10px 14px;margin-bottom:8px;}
+  .series-label{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:var(--accent);min-width:70px;}
+  .btn{padding:12px 28px;border-radius:8px;border:none;cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;transition:all .2s;display:inline-flex;align-items:center;gap:8px;}
+  .btn-primary{background:var(--accent);color:var(--bg);}
+  .btn-primary:hover{background:#00c8e0;transform:translateY(-1px);}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-danger{background:var(--red);color:#fff;}
+  .btn-success{background:var(--green);color:var(--bg);}
+  .btn-warning{background:var(--yellow);color:var(--bg);}
+  .actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap;}
+  .runner-tabs{display:flex;gap:0;margin-bottom:20px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);}
+  .runner-tab{flex:1;padding:14px;text-align:center;cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;background:var(--surface2);color:var(--muted);border:none;transition:all .2s;}
+  .runner-tab.active{background:var(--accent);color:var(--bg);}
+  .chrono-display{font-family:'Bebas Neue',sans-serif;font-size:5rem;letter-spacing:6px;color:var(--accent);text-align:center;line-height:1;}
+  .chrono-target{text-align:center;color:var(--muted);font-size:.85rem;margin-top:4px;font-family:'DM Mono',monospace;}
+  .chrono-bar-wrap{height:6px;background:var(--surface2);border-radius:3px;margin:12px 0;overflow:hidden;}
+  .chrono-bar{height:100%;background:var(--accent);transition:width .5s linear,background .3s;border-radius:3px;}
+  .btn-plot-wrap{display:flex;justify-content:center;margin:18px 0;}
+  .btn-plot{width:160px;height:160px;border-radius:50%;border:4px solid var(--accent);background:var(--surface2);color:var(--accent);font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;cursor:pointer;text-align:center;transition:all .15s;user-select:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;box-shadow:0 0 30px rgba(0,229,255,.1);}
+  .btn-plot:active{transform:scale(.95);box-shadow:0 0 50px rgba(0,229,255,.4);background:rgba(0,229,255,.1);}
+  .btn-plot svg{width:36px;height:36px;}
+  .btn-marche{padding:10px 20px;border-radius:8px;border:2px solid var(--red);background:transparent;color:var(--red);font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;cursor:pointer;transition:all .2s;}
+  .btn-marche.active{background:var(--red);color:#fff;}
+  .info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+  .info-box{background:var(--surface2);border-radius:8px;padding:12px;text-align:center;border:1px solid var(--border);}
+  .info-box .val{font-family:'Bebas Neue',sans-serif;font-size:1.6rem;letter-spacing:2px;}
+  .info-box .lbl{font-size:.65rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:2px;}
+  .val.green{color:var(--green);}.val.red{color:var(--red);}.val.yellow{color:var(--yellow);}.val.accent{color:var(--accent);}
+  .feedback-badge{text-align:center;font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;padding:12px;border-radius:8px;margin:10px 0;transition:all .3s;}
+  .feedback-badge.ok{background:rgba(0,255,136,.15);color:var(--green);border:1px solid var(--green);}
+  .feedback-badge.fast{background:rgba(255,45,85,.15);color:var(--red);border:1px solid var(--red);}
+  .feedback-badge.slow{background:rgba(255,215,0,.15);color:var(--yellow);border:1px solid var(--yellow);}
+  .feedback-badge.hidden{opacity:0;pointer-events:none;}
+  .table-wrap{overflow-x:auto;margin-top:16px;}
+  table.passage{border-collapse:collapse;width:100%;font-family:'DM Mono',monospace;font-size:.8rem;}
+  table.passage th{background:var(--surface2);color:var(--muted);padding:6px 10px;text-align:center;border:1px solid var(--border);font-size:.7rem;letter-spacing:1px;}
+  table.passage td{padding:6px 10px;text-align:center;border:1px solid var(--border);min-width:50px;}
+  table.passage td.crossed{color:var(--accent);font-weight:700;}
+  table.passage td.marche{background:rgba(255,45,85,.3);color:var(--red);}
+  .result-block{background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:12px;border-left:4px solid var(--accent);}
+  .result-block h3{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px;margin-bottom:10px;color:var(--accent);}
+  .current-runner-badge{display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--accent);border-radius:20px;padding:6px 16px;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:var(--accent);margin-bottom:16px;}
+  .dot-live{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .series-status-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+  .series-pill{padding:4px 14px;border-radius:20px;font-family:'DM Mono',monospace;font-size:.8rem;background:var(--surface2);border:1px solid var(--border);color:var(--muted);}
+  .series-pill.done{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.1);}
+  .series-pill.active{border-color:var(--accent);color:var(--accent);background:rgba(0,229,255,.1);}
+  .tag{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:700;letter-spacing:1px;}
+  .tag-green{background:rgba(0,255,136,.15);color:var(--green);}
+  .tag-red{background:rgba(255,45,85,.15);color:var(--red);}
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:999;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .modal-overlay.open{opacity:1;pointer-events:all;}
+  .modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:32px;max-width:440px;width:90%;text-align:center;}
+  .modal-box h2{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px;color:var(--accent);margin-bottom:12px;}
+  .modal-box p{color:var(--muted);margin-bottom:24px;font-size:.9rem;}
+  .modal-btns{display:flex;gap:12px;justify-content:center;}
+  .modal-btn{flex:1;padding:14px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;background:var(--surface2);color:var(--text);transition:all .2s;}
+  .modal-btn:hover{border-color:var(--accent);color:var(--accent);}
+  /* QR screen */
+  .qr-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media(max-width:600px){.qr-grid{grid-template-columns:1fr;}}
+  .qr-card{background:var(--surface2);border:2px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center;transition:border-color .3s;}
+  .qr-card.scanned{border-color:var(--green);}
+  .qr-card h3{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:var(--accent);margin-bottom:4px;}
+  .qr-card p{font-size:.75rem;color:var(--muted);margin-bottom:14px;}
+  .qr-wrap{background:#fff;border-radius:8px;padding:12px;display:inline-block;margin-bottom:10px;}
+  .qr-size-note{font-size:.7rem;color:var(--muted);margin-top:6px;}
+  .scanner-url{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);word-break:break-all;margin-top:8px;padding:6px;background:var(--bg);border-radius:4px;}
+  @media(max-width:500px){.chrono-display{font-size:3.5rem;}.btn-plot{width:130px;height:130px;}.info-grid{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div style="font-size:.65rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;">EPS — Course de Durée</div>
+    <h1>VMA Tracker</h1>
+  </div>
+  <div class="step-indicator">
+    <div class="step-dot active" id="dot1">1</div>
+    <div class="step-dot" id="dot2">2</div>
+    <div class="step-dot" id="dot3">3</div>
+    <div class="step-dot" id="dot4">4</div>
+    <div class="step-dot" id="dot5">QR</div>
+  </div>
+</header>
+
+<!-- Modal choix coureur -->
+<div class="modal-overlay" id="modalStarter">
+  <div class="modal-box">
+    <h2>Qui commence ?</h2>
+    <p>Choisissez le coureur qui démarre la première série.</p>
+    <div class="modal-btns" id="modalStarterBtns"></div>
+  </div>
+</div>
+
+<!-- ════ SCREEN 1 : CONFIG ════ -->
+<div class="screen active" id="screen1">
+  <div class="card">
+    <h2>⚙ Configuration de la Séance</h2>
+    <div class="form-grid three">
+      <div class="field"><label>Distance piste (m)</label><input type="number" id="distPiste" value="400" min="50" step="10"></div>
+      <div class="field"><label>Distance entre plots (m)</label><input type="number" id="distPlots" value="25" min="5" step="5"></div>
+      <div class="field"><label>Séance du jour</label><input type="text" id="nomSeance" placeholder="ex: Séance 3 — Aérobie"></div>
+    </div>
+    <div class="form-grid" style="margin-top:14px;">
+      <div class="field"><label>Classe</label><input type="text" id="nomClasse" placeholder="ex: 3ème A"></div>
+      <div class="field"><label>Date</label><input type="date" id="dateSeance"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>🏃 Séries</h2>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:16px;">Chaque série doit être un multiple de 1min30.</p>
+    <div class="field" style="margin-bottom:16px;max-width:200px;">
+      <label>Nombre de séries</label>
+      <input type="number" id="nbSeries" value="3" min="1" max="10" oninput="genSeries()">
+    </div>
+    <div id="seriesInputs"></div>
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="genSeries()">↺ Actualiser</button>
+      <button class="btn btn-primary" onclick="goStep2()">Suivant →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ SCREEN 2 : PROFILS ════ -->
+<div class="screen" id="screen2">
+  <div class="runner-tabs">
+    <button class="runner-tab active" onclick="showRunnerSetup(0)" id="tab0">👤 Coureur 1</button>
+    <button class="runner-tab" onclick="showRunnerSetup(1)" id="tab1">👤 Coureur 2</button>
+  </div>
+  <div id="runner0Setup" class="runner-setup">
+    <div class="card">
+      <h2>Coureur 1 — Profil</h2>
+      <div class="form-grid">
+        <div class="field"><label>Prénom / Nom</label><input type="text" id="r0name" placeholder="Prénom Nom"></div>
+        <div class="field"><label>VMA (km/h)</label><input type="number" id="r0vma" value="14" step="0.5" min="6" max="25" oninput="refreshAllVmaPct(0)"></div>
+      </div>
+    </div>
+    <div class="card"><h2>Projets de vitesse — Coureur 1</h2><div id="r0proj"></div></div>
+  </div>
+  <div id="runner1Setup" class="runner-setup" style="display:none;">
+    <div class="card">
+      <h2>Coureur 2 — Profil</h2>
+      <div class="form-grid">
+        <div class="field"><label>Prénom / Nom</label><input type="text" id="r1name" placeholder="Prénom Nom"></div>
+        <div class="field"><label>VMA (km/h)</label><input type="number" id="r1vma" value="12" step="0.5" min="6" max="25" oninput="refreshAllVmaPct(1)"></div>
+      </div>
+    </div>
+    <div class="card"><h2>Projets de vitesse — Coureur 2</h2><div id="r1proj"></div></div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-secondary" onclick="goStep(0)">← Retour</button>
+    <button class="btn btn-primary" onclick="goStep3()">Suivant →</button>
+  </div>
+</div>
+
+<!-- ════ SCREEN 3 : COURSE ════ -->
+<div class="screen" id="screen3">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+    <div>
+      <div class="current-runner-badge"><div class="dot-live"></div><span id="activeName">—</span></div>
+      <div style="color:var(--muted);font-size:.8rem;" id="serieLabel">Série —</div>
+    </div>
+    <button class="btn btn-secondary" onclick="switchRunner()" id="btnSwitch">↔ Changer de coureur</button>
+  </div>
+  <div id="seriesPills" class="series-status-list"></div>
+  <div class="card">
+    <div class="chrono-display" id="chronoDisplay">00:00</div>
+    <div class="chrono-target" id="chronoTarget">Objectif : 00:00</div>
+    <div class="chrono-bar-wrap"><div class="chrono-bar" id="chronoBar" style="width:0%"></div></div>
+    <div class="info-grid">
+      <div class="info-box"><div class="val accent" id="dispVitMoy">—</div><div class="lbl">Vit. moy. col.</div></div>
+      <div class="info-box"><div class="val accent" id="dispVitCible">—</div><div class="lbl">Cible (km/h)</div></div>
+      <div class="info-box"><div class="val accent" id="dispEcart">—</div><div class="lbl">Écart (km/h)</div></div>
+    </div>
+    <div class="feedback-badge hidden" id="feedbackBadge">DANS LA ZONE</div>
+    <div class="btn-plot-wrap">
+      <button class="btn-plot" id="btnPlot" onclick="clickPlot()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+        PLOT
+      </button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;">
+      <button class="btn-marche" id="btnMarche" onclick="toggleMarche()">🚶 MARCHE</button>
+      <button class="btn btn-primary" id="btnStartStop" onclick="startStopSerie()">▶ DÉMARRER</button>
+      <button class="btn btn-warning" onclick="nextSerie()" id="btnNextSerie" style="display:none;">→ Série suivante</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Tableau des passages</h3>
+    <div class="table-wrap" id="tableWrap"></div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-success" onclick="goStep4()">✓ Terminer la séance</button>
+  </div>
+</div>
+
+<!-- ════ SCREEN 4 : RÉSULTATS ════ -->
+<div class="screen" id="screen4">
+  <div class="card"><h2>📊 Bilan de Séance</h2><div id="resultsContent"></div></div>
+  <div class="actions">
+    <button class="btn btn-primary" onclick="exportCSV()">⬇ Exporter CSV</button>
+    <button class="btn btn-secondary" onclick="exportXLS()">⬇ Exporter Excel</button>
+    <button class="btn btn-success" onclick="goStep5()">📱 Générer QR Code →</button>
+    <button class="btn btn-secondary" onclick="location.reload()">↺ Nouvelle séance</button>
+  </div>
+</div>
+
+<!-- ════ SCREEN 5 : QR CODES ════ -->
+<div class="screen" id="screen5">
+  <div class="card">
+    <h2>📱 QR Codes — Transfert vers l'agrégateur</h2>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:20px;">
+      Scannez chaque QR code avec votre smartphone ou tablette depuis la page Agrégateur.
+      Les données sont compressées et encodées dans l'URL — aucun réseau requis sur cette tablette.
+    </p>
+    <div class="qr-grid" id="qrGrid"></div>
+  </div>
+  <div class="card" style="border-color:var(--accent);">
+    <h3 style="color:var(--accent);font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;margin-bottom:10px;">
+      📋 URL de l'agrégateur
+    </h3>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px;">
+      Ouvrez cette page sur votre PC ou smartphone pour recevoir les données scannées :
+    </p>
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;font-family:'DM Mono',monospace;font-size:.8rem;color:var(--accent);">
+      agregateur-vma.html
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-secondary" onclick="goStep(3)">← Retour résultats</button>
+    <button class="btn btn-secondary" onclick="location.reload()">↺ Nouvelle séance</button>
+  </div>
+</div>
+
+<script>
+const S={
+  distPiste:400,distPlots:25,nomSeance:'',nomClasse:'',dateSeance:'',
+  series:[],
+  runners:[{name:'Coureur 1',vma:14,projets:[]},{name:'Coureur 2',vma:12,projets:[]}],
+  activeRunner:0,currentSerieIdx:0,
+  data:[[],[]],
+  chronoInterval:null,chronoStart:null,chronoElapsed:0,
+  chronoRunning:false,chronoFinished:false,
+  plotCount:0,colCount:0,marcheNext:false
+};
+
+function msToDurStr(ms){
+  const t=Math.floor(ms/1000),m=Math.floor(t/60),s=t%60;
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+// ── Navigation ──
+function goStep(n){
+  document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));
+  document.getElementById('screen'+(n+1)).classList.add('active');
+  document.querySelectorAll('.step-dot').forEach((d,i)=>{
+    d.classList.toggle('active',i===n);
+    d.classList.toggle('done',i<n);
+  });
+  window.scrollTo(0,0);
+}
+
+// ── Step 1 ──
+function genSeries(){
+  const nb=parseInt(document.getElementById('nbSeries').value)||3;
+  const wrap=document.getElementById('seriesInputs');
+  wrap.innerHTML='';
+  for(let i=0;i<nb;i++){
+    const prev=S.series[i];
+    const defMin=prev?Math.floor(prev.dureeMs/60000):(i+1)*3;
+    const defSec=prev?Math.floor((prev.dureeMs%60000)/1000):0;
+    const row=document.createElement('div');
+    row.className='series-row';
+    row.innerHTML=`<span class="series-label">SÉRIE ${i+1}</span>
+      <div class="field" style="flex:1"><label>Minutes</label><input type="number" id="sm${i}" value="${defMin}" min="1" step="1"></div>
+      <div class="field" style="flex:1"><label>Secondes</label><select id="ss${i}"><option value="0" ${defSec===0?'selected':''}>00</option><option value="30" ${defSec===30?'selected':''}>30</option></select></div>
+      <div style="font-size:.7rem;color:var(--muted);min-width:80px;" id="sinfo${i}"></div>`;
+    wrap.appendChild(row);
+    document.getElementById('sm'+i).addEventListener('input',()=>updateSerieInfo(i));
+    document.getElementById('ss'+i).addEventListener('change',()=>updateSerieInfo(i));
+    updateSerieInfo(i);
+  }
+}
+
+function updateSerieInfo(i){
+  const mEl=document.getElementById('sm'+i),sEl=document.getElementById('ss'+i);
+  if(!mEl||!sEl)return;
+  const ms=(parseInt(mEl.value)||0)*60000+(parseInt(sEl.value)||0)*1000;
+  const cols=ms/90000;
+  const el=document.getElementById('sinfo'+i);
+  if(el)el.textContent=(ms>0&&Number.isInteger(cols))?`${cols} col.`:'⚠ non multiple';
+}
+
+function goStep2(){
+  const nb=parseInt(document.getElementById('nbSeries').value)||3;
+  const series=[];
+  for(let i=0;i<nb;i++){
+    const mEl=document.getElementById('sm'+i),sEl=document.getElementById('ss'+i);
+    if(!mEl||!sEl){alert(`Cliquez d'abord sur "Actualiser"`);return;}
+    const ms=(parseInt(mEl.value)||0)*60000+(parseInt(sEl.value)||0)*1000;
+    if(ms<=0){alert(`Série ${i+1} : durée invalide`);return;}
+    if(ms%90000!==0){alert(`Série ${i+1} : doit être multiple de 1min30`);return;}
+    series.push({dureeMs:ms,nbCols:ms/90000});
+  }
+  S.series=series;
+  S.distPiste=parseInt(document.getElementById('distPiste').value)||400;
+  S.distPlots=parseInt(document.getElementById('distPlots').value)||25;
+  S.nomSeance=document.getElementById('nomSeance').value||'Séance';
+  S.nomClasse=document.getElementById('nomClasse').value||'';
+  S.dateSeance=document.getElementById('dateSeance').value||new Date().toISOString().slice(0,10);
+  S.data=[[],[]];
+  for(let r=0;r<2;r++)for(let i=0;i<nb;i++)S.data[r].push({passages:[],marcheIndices:[],colStarts:[]});
+  buildProjInputs();
+  goStep(1);
+}
+
+// ── Step 2 ──
+function buildProjInputs(){
+  for(let r=0;r<2;r++){
+    const wrap=document.getElementById('r'+r+'proj');
+    wrap.innerHTML='';
+    S.series.forEach((serie,i)=>{
+      const prev=S.runners[r].projets[i]||'';
+      const row=document.createElement('div');
+      row.className='series-row';
+      row.innerHTML=`<span class="series-label">S${i+1}</span>
+        <div style="color:var(--muted);font-size:.8rem;min-width:80px;">${msToDurStr(serie.dureeMs)}</div>
+        <div class="field" style="flex:1"><label>Vitesse cible (km/h)</label><input type="number" id="r${r}p${i}" value="${prev}" step="0.1" min="4" max="30" placeholder="ex: 11.5"></div>
+        <div style="font-size:.7rem;color:var(--muted);min-width:60px;" id="r${r}ppct${i}"></div>`;
+      wrap.appendChild(row);
+      document.getElementById(`r${r}p${i}`).addEventListener('input',()=>updateVmaPct(r,i));
+      updateVmaPct(r,i);
+    });
+  }
+}
+
+function updateVmaPct(r,i){
+  const vma=parseFloat(document.getElementById('r'+r+'vma').value)||0;
+  const v=parseFloat(document.getElementById('r'+r+'p'+i).value)||0;
+  const el=document.getElementById('r'+r+'ppct'+i);
+  if(el)el.textContent=(vma>0&&v>0)?Math.round(v/vma*100)+'% VMA':'';
+}
+
+function refreshAllVmaPct(r){S.series.forEach((_,i)=>updateVmaPct(r,i));}
+
+function showRunnerSetup(r){
+  document.querySelectorAll('.runner-setup').forEach(e=>e.style.display='none');
+  document.getElementById('runner'+r+'Setup').style.display='block';
+  document.querySelectorAll('.runner-tab').forEach((t,i)=>t.classList.toggle('active',i===r));
+}
+
+function goStep3(){
+  for(let r=0;r<2;r++){
+    const name=document.getElementById('r'+r+'name').value.trim();
+    const vma=parseFloat(document.getElementById('r'+r+'vma').value);
+    if(!name){alert(`Coureur ${r+1} : prénom manquant`);showRunnerSetup(r);return;}
+    if(!vma||vma<=0){alert(`${name} : VMA invalide`);showRunnerSetup(r);return;}
+    const projets=[];
+    for(let i=0;i<S.series.length;i++){
+      const v=parseFloat(document.getElementById('r'+r+'p'+i).value);
+      if(!v||v<=0){alert(`${name} : vitesse cible S${i+1} manquante`);showRunnerSetup(r);return;}
+      projets.push(v);
+    }
+    S.runners[r].name=name;S.runners[r].vma=vma;S.runners[r].projets=projets;
+  }
+  document.getElementById('tab0').textContent='👤 '+S.runners[0].name;
+  document.getElementById('tab1').textContent='👤 '+S.runners[1].name;
+  openStarterModal();
+}
+
+function openStarterModal(){
+  const modal=document.getElementById('modalStarter');
+  const btnWrap=document.getElementById('modalStarterBtns');
+  btnWrap.innerHTML='';
+  [0,1].forEach(r=>{
+    const btn=document.createElement('button');
+    btn.className='modal-btn';btn.textContent=S.runners[r].name;
+    btn.onclick=()=>{modal.classList.remove('open');S.activeRunner=r;S.currentSerieIdx=0;initCourse();goStep(2);};
+    btnWrap.appendChild(btn);
+  });
+  modal.classList.add('open');
+}
+
+// ── Course ──
+function initCourse(){
+  S.chronoRunning=false;S.chronoFinished=false;
+  S.plotCount=0;S.colCount=0;S.marcheNext=false;
+  clearInterval(S.chronoInterval);S.chronoInterval=null;S.chronoElapsed=0;
+  renderCourseUI();
+}
+
+function renderCourseUI(){
+  const r=S.activeRunner,si=S.currentSerieIdx;
+  const runner=S.runners[r],serie=S.series[si];
+  document.getElementById('activeName').textContent=runner.name+' — S'+(si+1);
+  document.getElementById('serieLabel').textContent=`Série ${si+1}/${S.series.length} · ${msToDurStr(serie.dureeMs)} · Cible : ${runner.projets[si]} km/h`;
+  const pills=document.getElementById('seriesPills');pills.innerHTML='';
+  S.series.forEach((_,i)=>{
+    const d0=S.data[0][i].passages.length>0,d1=S.data[1][i].passages.length>0;
+    const pill=document.createElement('div');
+    pill.className='series-pill'+(i===si?' active':(d0||d1?' done':''));
+    pill.textContent='S'+(i+1)+(d0?' ✓₁':'')+(d1?' ✓₂':'');
+    pills.appendChild(pill);
+  });
+  document.getElementById('dispVitCible').textContent=runner.projets[si]+' km/h';
+  document.getElementById('dispVitMoy').textContent='—';
+  document.getElementById('dispEcart').textContent='—';
+  document.getElementById('dispEcart').className='val accent';
+  document.getElementById('feedbackBadge').className='feedback-badge hidden';
+  updateChronoDisplay(0);
+  const bar=document.getElementById('chronoBar');bar.style.width='0%';bar.style.background='var(--accent)';
+  document.getElementById('chronoTarget').textContent='Objectif : '+msToDurStr(serie.dureeMs);
+  document.getElementById('btnStartStop').textContent='▶ DÉMARRER';
+  document.getElementById('btnStartStop').className='btn btn-primary';
+  document.getElementById('btnNextSerie').style.display='none';
+  document.getElementById('btnMarche').classList.remove('active');
+  setBtnPlot(false);document.getElementById('btnSwitch').disabled=false;
+  renderTable();
+}
+
+function setBtnPlot(on){
+  const b=document.getElementById('btnPlot');
+  b.style.opacity=on?'1':'0.4';b.style.pointerEvents=on?'auto':'none';
+}
+function updateChronoDisplay(ms){document.getElementById('chronoDisplay').textContent=msToDurStr(ms);}
+
+function startStopSerie(){
+  if(S.chronoFinished){finishSerie();return;}
+  if(!S.chronoRunning){
+    S.chronoRunning=true;S.chronoStart=Date.now()-S.chronoElapsed;
+    const d=S.data[S.activeRunner][S.currentSerieIdx];
+    if(d.colStarts.length===0){d.colStarts.push(0);S.colCount=0;S.plotCount=0;}
+    document.getElementById('btnStartStop').textContent='⏸ PAUSE';
+    document.getElementById('btnStartStop').className='btn btn-danger';
+    setBtnPlot(true);document.getElementById('btnSwitch').disabled=true;
+    const serie=S.series[S.currentSerieIdx];
+    S.chronoInterval=setInterval(()=>{
+      S.chronoElapsed=Date.now()-S.chronoStart;
+      updateChronoDisplay(S.chronoElapsed);
+      const pct=Math.min(S.chronoElapsed/serie.dureeMs*100,100);
+      const bar=document.getElementById('chronoBar');
+      bar.style.width=pct+'%';bar.style.background=pct>95?'var(--red)':pct>80?'var(--yellow)':'var(--accent)';
+      const d2=S.data[S.activeRunner][S.currentSerieIdx];
+      const colElapsed=S.chronoElapsed-(d2.colStarts[S.colCount]||0);
+      if(colElapsed>=90000&&S.colCount<serie.nbCols-1){
+        S.colCount++;S.plotCount=0;d2.colStarts.push(S.chronoElapsed);
+      }
+      if(S.chronoElapsed>=serie.dureeMs){
+        clearInterval(S.chronoInterval);S.chronoRunning=false;S.chronoFinished=true;
+        S.chronoElapsed=serie.dureeMs;updateChronoDisplay(serie.dureeMs);
+        bar.style.width='100%';bar.style.background='var(--green)';
+        document.getElementById('btnStartStop').textContent='✓ TERMINER LA SÉRIE';
+        document.getElementById('btnStartStop').className='btn btn-success';
+        setBtnPlot(false);
+      }
+    },100);
+  } else {
+    clearInterval(S.chronoInterval);S.chronoRunning=false;
+    document.getElementById('btnStartStop').textContent='▶ REPRENDRE';
+    document.getElementById('btnStartStop').className='btn btn-primary';
+    setBtnPlot(false);
+  }
+}
+
+function finishSerie(){
+  S.chronoFinished=false;
+  document.getElementById('btnNextSerie').style.display='inline-flex';
+  document.getElementById('btnSwitch').disabled=false;
+}
+
+function toggleMarche(){
+  S.marcheNext=!S.marcheNext;
+  document.getElementById('btnMarche').classList.toggle('active',S.marcheNext);
+}
+
+function clickPlot(){
+  if(!S.chronoRunning)return;
+  const now=S.chronoElapsed,r=S.activeRunner,si=S.currentSerieIdx;
+  const d=S.data[r][si],isM=S.marcheNext;
+  const idx=d.passages.length;
+  d.passages.push({t:now,col:S.colCount,isMarche:isM});
+  if(isM)d.marcheIndices.push(idx);
+  S.marcheNext=false;document.getElementById('btnMarche').classList.remove('active');
+  S.plotCount++;
+  const colPassages=d.passages.filter(p=>p.col===S.colCount);
+  const colStart=d.colStarts[S.colCount]||0;
+  const colElapsedNow=now-colStart;
+  const vitCible=S.runners[r].projets[si];
+  if(colElapsedNow>0&&colPassages.length>0){
+    const vitMoy=colPassages.length*S.distPlots/(colElapsedNow/1000)*3.6;
+    const ecart=vitMoy-vitCible;
+    document.getElementById('dispVitMoy').textContent=vitMoy.toFixed(1)+' km/h';
+    document.getElementById('dispEcart').textContent=(ecart>=0?'+':'')+ecart.toFixed(1);
+    const fb=document.getElementById('feedbackBadge');
+    if(Math.abs(ecart)<=0.5){fb.className='feedback-badge ok';fb.textContent='✓ DANS LA ZONE';document.getElementById('dispEcart').className='val green';}
+    else if(ecart>0.5){fb.className='feedback-badge fast';fb.textContent='⚡ TROP RAPIDE';document.getElementById('dispEcart').className='val red';}
+    else{fb.className='feedback-badge slow';fb.textContent='🐢 TROP LENT';document.getElementById('dispEcart').className='val yellow';}
+  }
+  renderTable();
+}
+
+function renderTable(){
+  const r=S.activeRunner,si=S.currentSerieIdx;
+  const serie=S.series[si],d=S.data[r][si];
+  const wrap=document.getElementById('tableWrap');
+  if(d.passages.length===0){wrap.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px;">En attente du premier passage…</p>';return;}
+  const nbCols=serie.nbCols;
+  const colGroups=[];
+  for(let c=0;c<nbCols;c++)colGroups.push(d.passages.filter(p=>p.col===c));
+  const maxRows=Math.max(...colGroups.map(g=>g.length),1);
+  let html='<table class="passage"><thead><tr><th>Plot</th>';
+  for(let c=0;c<nbCols;c++)html+=`<th>Col.${c+1}<br><small>${msToDurStr(c*90000)}–${msToDurStr((c+1)*90000)}</small></th>`;
+  html+='</tr></thead><tbody>';
+  for(let row=maxRows-1;row>=0;row--){
+    html+=`<tr><td style="color:var(--muted)">${row+1}</td>`;
+    for(let c=0;c<nbCols;c++){
+      const p=colGroups[c][row];
+      html+=p?`<td class="${p.isMarche?'marche':'crossed'}">${p.isMarche?'🚶':'×'}</td>`:'<td></td>';
+    }
+    html+='</tr>';
+  }
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+}
+
+function nextSerie(){
+  if(S.currentSerieIdx<S.series.length-1){S.currentSerieIdx++;document.getElementById('btnNextSerie').style.display='none';initCourse();}
+  else alert('Toutes les séries terminées pour '+S.runners[S.activeRunner].name+' !');
+}
+
+function switchRunner(){
+  if(S.chronoRunning){alert('Mettez en pause d\'abord.');return;}
+  S.activeRunner=S.activeRunner===0?1:0;
+  let nextSi=S.series.length-1;
+  for(let i=0;i<S.series.length;i++){if(S.data[S.activeRunner][i].passages.length===0){nextSi=i;break;}}
+  S.currentSerieIdx=nextSi;initCourse();
+}
+
+// ── Résultats ──
+function goStep4(){
+  if(S.chronoRunning){alert('Terminez la série en cours.');return;}
+  renderResults();goStep(3);
+}
+
+function renderResults(){
+  const wrap=document.getElementById('resultsContent');
+  let html=`<p style="color:var(--muted);margin-bottom:20px;">${S.nomSeance}${S.nomClasse?' · '+S.nomClasse:''} · ${S.dateSeance} · Plots ${S.distPlots}m</p>`;
+  for(let r=0;r<2;r++){
+    const runner=S.runners[r];
+    html+=`<div class="result-block"><h3>${runner.name} — VMA ${runner.vma} km/h</h3>`;
+    S.series.forEach((serie,si)=>{
+      const d=S.data[r][si];
+      const passages=d.passages.length,marche=d.marcheIndices.length;
+      const dist=passages*S.distPlots;
+      const vitMoy=serie.dureeMs>0?(dist/(serie.dureeMs/1000)*3.6):0;
+      const cible=runner.projets[si],ecart=vitMoy-cible,zone=Math.abs(ecart)<=0.5;
+      html+=`<div style="margin:8px 0;padding:8px;background:var(--bg);border-radius:6px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        <span style="font-family:'Bebas Neue',sans-serif;color:var(--accent)">S${si+1}</span>
+        <span style="font-size:.8rem;color:var(--muted)">${msToDurStr(serie.dureeMs)}</span>
+        <span>${passages} plots · ${dist}m</span>
+        <span>Vit moy: <b style="color:${zone?'var(--green)':ecart>0.5?'var(--red)':'var(--yellow)'}">${vitMoy.toFixed(1)} km/h</b></span>
+        <span>Cible: ${cible} km/h (${Math.round(cible/runner.vma*100)}%VMA)</span>
+        <span class="tag ${zone?'tag-green':'tag-red'}">${zone?'✓ DANS LA ZONE':ecart>0.5?'⚡ TROP RAPIDE':'🐢 TROP LENT'}</span>
+        ${marche>0?`<span class="tag tag-red">🚶 ${marche} marche(s)</span>`:''}
+      </div>`;
+    });
+    html+='</div>';
+  }
+  wrap.innerHTML=html;
+}
+
+// ── QR Code ──
+function buildPayload(){
+  const payload={
+    v:1,
+    seance:S.nomSeance,
+    classe:S.nomClasse,
+    date:S.dateSeance,
+    distPlots:S.distPlots,
+    distPiste:S.distPiste,
+    series:S.series.map(s=>({dureeMs:s.dureeMs,nbCols:s.nbCols})),
+    runners:[]
+  };
+  for(let r=0;r<2;r++){
+    const runner=S.runners[r];
+    const runnerData={name:runner.name,vma:runner.vma,series:[]};
+    S.series.forEach((serie,si)=>{
+      const d=S.data[r][si];
+      const passages=d.passages.length;
+      const dist=passages*S.distPlots;
+      const vitMoy=serie.dureeMs>0?(dist/(serie.dureeMs/1000)*3.6):0;
+      const cible=runner.projets[si];
+      const ecart=vitMoy-cible;
+      runnerData.series.push({
+        idx:si,
+        dureeMs:serie.dureeMs,
+        nbCols:serie.nbCols,
+        cible:cible,
+        pctVma:Math.round(cible/runner.vma*100),
+        passages:passages,
+        dist:dist,
+        vitMoy:parseFloat(vitMoy.toFixed(2)),
+        ecart:parseFloat(ecart.toFixed(2)),
+        zone:Math.abs(ecart)<=0.5,
+        marches:d.marcheIndices.length
+      });
+    });
+    payload.runners.push(runnerData);
+  }
+  return payload;
+}
+
+function goStep5(){
+  goStep(4);
+  const grid=document.getElementById('qrGrid');
+  grid.innerHTML='<p style="color:var(--muted);text-align:center;padding:20px;">Génération des QR codes…</p>';
+
+  setTimeout(()=>{
+    grid.innerHTML='';
+    const payload=buildPayload();
+
+    // Un QR par coureur
+    for(let r=0;r<2;r++){
+      const runnerPayload={
+        v:payload.v,seance:payload.seance,classe:payload.classe,
+        date:payload.date,distPlots:payload.distPlots,distPiste:payload.distPiste,
+        series:payload.series,
+        runner:payload.runners[r]
+      };
+      const json=JSON.stringify(runnerPayload);
+      const compressed=LZString.compressToEncodedURIComponent(json);
+      const url='agregateur-vma.html?d='+compressed;
+      const byteSize=new TextEncoder().encode(compressed).length;
+      const kb=(byteSize/1024).toFixed(1);
+
+      const card=document.createElement('div');
+      card.className='qr-card';
+      card.innerHTML=`
+        <h3>${payload.runners[r].name}</h3>
+        <p>${payload.seance}${payload.classe?' · '+payload.classe:''} · ${payload.date}</p>
+        <div class="qr-wrap" id="qr${r}"></div>
+        <div class="qr-size-note">Taille données : ${kb} ko</div>
+        <div class="scanner-url">${url.slice(0,120)}${url.length>120?'…':''}</div>`;
+      grid.appendChild(card);
+
+      // Taille QR adaptée
+      const qrSize = byteSize > 1500 ? 200 : 180;
+      try {
+        new QRCode(document.getElementById('qr'+r),{
+          text:url,
+          width:qrSize,height:qrSize,
+          correctLevel:QRCode.CorrectLevel.M
+        });
+      } catch(e) {
+        document.getElementById('qr'+r).innerHTML=
+          `<p style="color:var(--red);font-size:.75rem;">Données trop volumineuses pour un QR code.<br>Utilisez l'export CSV à la place.</p>`;
+      }
+    }
+  }, 100);
+}
+
+// ── Export CSV/XLS ──
+function buildCSVData(){
+  const rows=[['Séance',S.nomSeance,'Classe',S.nomClasse,'Date',S.dateSeance,'Piste',S.distPiste+'m','Plots',S.distPlots+'m'],[]];
+  for(let r=0;r<2;r++){
+    const runner=S.runners[r];
+    rows.push([runner.name,'VMA '+runner.vma+' km/h']);
+    rows.push(['Série','Durée','Cible (km/h)','%VMA','Passages','Distance (m)','Vit moy (km/h)','Écart','Zone?','Marches']);
+    S.series.forEach((serie,si)=>{
+      const d=S.data[r][si];
+      const passages=d.passages.length,dist=passages*S.distPlots;
+      const vitMoy=serie.dureeMs>0?(dist/(serie.dureeMs/1000)*3.6):0;
+      const cible=runner.projets[si],ecart=(vitMoy-cible).toFixed(1);
+      rows.push([`S${si+1}`,msToDurStr(serie.dureeMs),cible,Math.round(cible/runner.vma*100)+'%',
+        passages,dist,vitMoy.toFixed(1),ecart,Math.abs(vitMoy-cible)<=0.5?'OUI':'NON',d.marcheIndices.length]);
+    });
+    rows.push([]);
+  }
+  return rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+}
+
+function exportCSV(){
+  const csv=buildCSVData();
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`VMA_${(S.nomClasse||S.nomSeance).replace(/\s+/g,'_')}_${S.dateSeance}.csv`;a.click();
+}
+
+function exportXLS(){
+  const csv=buildCSVData();
+  let html='<html><head><meta charset="UTF-8"></head><body><table border="1">';
+  csv.split('\n').forEach(line=>{
+    html+='<tr>';
+    line.split(',').forEach(cell=>{html+=`<td>${cell.replace(/^"|"$/g,'').replace(/""/g,'"')}</td>`;});
+    html+='</tr>';
+  });
+  html+='</table></body></html>';
+  const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`VMA_${(S.nomClasse||S.nomSeance).replace(/\s+/g,'_')}_${S.dateSeance}.xls`;a.click();
+}
+
+// Init date du jour
+document.getElementById('dateSeance').value=new Date().toISOString().slice(0,10);
+genSeries();
+</script>
+
+<script>
+// ── Enregistrement du Service Worker (PWA) ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(registration => {
+        console.log('✅ Service Worker enregistré — scope :', registration.scope);
+
+        // Détection d'une mise à jour disponible
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // Nouvelle version disponible — notification discrète
+              console.log('🔄 Nouvelle version disponible. Rechargez la page pour l\'appliquer.');
+              // Optionnel : afficher un toast/bannière ici
+            }
+          });
+        });
+      })
+      .catch(err => console.warn('❌ Service Worker — échec d\'enregistrement :', err));
+  });
+}
+</script>
+</body>
+</html>
